@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 // filename:    ServQuery.uc
-// version:     112
+// version:     113
 // author:      Michiel 'El Muerte' Hendriks <elmuerte@drunksnipers.com>
 // additional
 //      ideas:  Ben Smit - ProAsm <proasm@stormnet.co.za>
@@ -9,7 +9,7 @@
 
 class ServQuery extends UdpGameSpyQuery;
 
-const VERSION = "112";
+const VERSION = "113";
 
 var config bool bVerbose;
 var config string sReplyTo;
@@ -97,7 +97,7 @@ function string ParseQuery( IpAddr Addr, coerce string Query, int QueryNum, out 
 	}
   else if( QueryType=="about" )
 	{
-		if (replayToQuery("A")) Result = SendQueryPacket(Addr, "\\about\\ServQuery "$VERSION$"\\author\\Michiel 'El Muerte' Hendriks\\authoremail\\elmuerte@drunksnipers.com", QueryNum, PacketNum, bFinalPacket);
+		if (replayToQuery("A")) Result = SendQueryPacket(Addr, "\\about\\ServQuery "$VERSION$"\\author\\Michiel 'El Muerte' Hendriks\\authoremail\\elmuerte@drunksnipers.com\\HighestRequestCount\\"$string(iHighestRequestCount), QueryNum, PacketNum, bFinalPacket);
 	}
   else if( QueryType=="spectators" )
 	{
@@ -166,7 +166,7 @@ function string FixPlayerName(string name)
   return name;
 }
 
-function string GetPlayerDetails( PlayerController P, int PlayerNum )
+function string GetPlayerDetails( Controller P, int PlayerNum )
 {
   local string ResultSet;
 
