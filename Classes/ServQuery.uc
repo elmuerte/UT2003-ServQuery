@@ -339,7 +339,7 @@ function string GetBot( Controller P, int PlayerNum )
 	ResultSet = "\\bot_"$PlayerNum$"\\"$FixPlayerName(P.PlayerReplicationInfo.PlayerName);
 
   // Ping
-	ResultSet = ResultSet$"\\ping_"$PlayerNum$"\\"$P.PlayerReplicationInfo.Ping;
+	ResultSet = ResultSet$"\\ping_"$PlayerNum$"\\ "$P.PlayerReplicationInfo.Ping;
 
 	return ResultSet$GetPlayerDetails(P, PlayerNum);
 }
