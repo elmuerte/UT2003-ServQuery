@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 // filename:    ServQuery.uc
-// version:     107
+// version:     108
 // author:      Michiel 'El Muerte' Hendriks <elmuerte@drunksnipers.com>
 // additional
 //      ideas:  Ben Smit - ProAsm <proasm@stormnet.co.za>
@@ -9,7 +9,59 @@
 
 class ServQuery extends UdpGameSpyQuery;
 
-const VERSION = "107";
+const VERSION = "108beta";
+
+var config int iProtectionType;
+var config int iMaxQueryPerSecond; // type 1
+var int iCurrentCount;
+var config int iMaxQueryPerHostPerSecond; // type 2
+struct HostRecord
+{
+  var IpAddr Addr;
+  var int count;
+};
+var array<HostRecord> HostRecords;
+
+function PreBeginPlay()
+{
+  SetTimer(1, true);
+  Super.PreBeginPlay();
+}
+
+function int getHostDelay(IpAddr Addr)
+{
+  local int i;
+  for (i = 0; i < HostRecords.length-1; i++)
+  {
+    if (HostRecords[i].Addr == Addr)
+    {
+      return ++HostRecords[i].count;
+    }
+  }
+  HostRecords.Length = HostRecords.Length+1;
+  HostRecords[i].Addr = Addr;
+  return ++HostRecords[i].count;
+}
+
+event ReceivedText( IpAddr Addr, string Text )
+{
+  if ((iProtectionType == 1) || (iProtectionType == -1))
+  {
+    iCurrentCount++;
+    if (iCurrentCount > iMaxQueryPerSecond) return;
+  }
+  if ((iProtectionType == 2) || (iProtectionType == -1))
+  {
+    if (getHostDelay(addr) > iMaxQueryPerHostPerSecond) return;
+  }
+  Super.ReceivedText(addr, text);
+}
+
+event Timer()
+{
+  iCurrentCount=0; // clear count every second;
+  HostRecords.Length = 0;
+}
 
 function string ParseQuery( IpAddr Addr, coerce string Query, int QueryNum, out int PacketNum )
 {
@@ -40,6 +92,12 @@ function string ParseQuery( IpAddr Addr, coerce string Query, int QueryNum, out 
   else if( QueryType=="maplist" )
 	{
     Result = SendQueryPacket(Addr, GetMaplist(), QueryNum, PacketNum, bFinalPacket);
+	}
+  else if( QueryType=="echo" )
+	{
+		// fixed to remove the \n
+    ReplaceText(QueryValue, chr(10), "");
+		Result = SendQueryPacket(Addr, "\\echo\\"$QueryValue, QueryNum, PacketNum, bFinalPacket);
 	}
   else super.ParseQuery(Addr, Query, QueryNum, PacketNum);
   return QueryRest;
@@ -225,4 +283,11 @@ function string GetMaplist()
     }
   }
   return ResultSet;
+}
+
+defaultproperties
+{
+  iProtectionType=0
+  iMaxQueryPerSecond=30
+  iMaxQueryPerHostPerSecond=2
 }
