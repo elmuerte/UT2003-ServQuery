@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 // filename:    ServQuery.uc
-// version:     108
+// version:     109
 // author:      Michiel 'El Muerte' Hendriks <elmuerte@drunksnipers.com>
 // additional
 //      ideas:  Ben Smit - ProAsm <proasm@stormnet.co.za>
@@ -9,8 +9,10 @@
 
 class ServQuery extends UdpGameSpyQuery;
 
-const VERSION = "108beta";
+const VERSION = "109beta";
 
+var config bool bVerbose;
+var config int iTimeframe;
 var config int iProtectionType;
 var config int iMaxQueryPerSecond; // type 1
 var int iCurrentCount;
@@ -22,9 +24,11 @@ struct HostRecord
 };
 var array<HostRecord> HostRecords;
 
+var int iHighestRequestCount; // for stats only
+
 function PreBeginPlay()
 {
-  SetTimer(1, true);
+  SetTimer(iTimeframe, true);
   Super.PreBeginPlay();
 }
 
@@ -45,20 +49,33 @@ function int getHostDelay(IpAddr Addr)
 
 event ReceivedText( IpAddr Addr, string Text )
 {
+  iCurrentCount++;
   if ((iProtectionType == 1) || (iProtectionType == -1))
-  {
-    iCurrentCount++;
-    if (iCurrentCount > iMaxQueryPerSecond) return;
+  {    
+    if (iCurrentCount > iMaxQueryPerSecond) 
+    {
+      if (bVerbose) Log("ServQuery: Query from"@IpAddrToString(addr)@"rejected (iMaxQueryPerSecond)");
+      return;
+    }
   }
   if ((iProtectionType == 2) || (iProtectionType == -1))
   {
-    if (getHostDelay(addr) > iMaxQueryPerHostPerSecond) return;
+    if (getHostDelay(addr) > iMaxQueryPerHostPerSecond) 
+    {
+      if (bVerbose) Log("ServQuery: Query from"@IpAddrToString(addr)@"rejected (iMaxQueryPerHostPerSecond)");
+      return;
+    }
   }
   Super.ReceivedText(addr, text);
 }
 
 event Timer()
 {
+  if (iCurrentCount > iHighestRequestCount) 
+  {
+    iHighestRequestCount = iCurrentCount;
+    log("ServQuery: Highest Request Count Per Timeframe ("$iTimeframe@"sec):"@iHighestRequestCount);
+  }
   iCurrentCount=0; // clear count every second;
   HostRecords.Length = 0;
 }
@@ -287,7 +304,9 @@ function string GetMaplist()
 
 defaultproperties
 {
-  iProtectionType=0
-  iMaxQueryPerSecond=30
-  iMaxQueryPerHostPerSecond=2
+  bVerbose=false
+  iTimeframe=60
+  iProtectionType=0  
+  iMaxQueryPerSecond=180
+  iMaxQueryPerHostPerSecond=10
 }
