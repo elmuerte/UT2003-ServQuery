@@ -18,6 +18,8 @@ var config int iProtectionType;
 var config int iMaxQueryPerSecond; // type 1
 var int iCurrentCount;
 var config int iMaxQueryPerHostPerSecond; // type 2
+var config string sPassword;
+
 struct HostRecord
 {
   var IpAddr Addr;
@@ -123,6 +125,10 @@ function string ParseQuery( IpAddr Addr, coerce string Query, int QueryNum, out 
 	{
     if (replayToQuery("B")) SendBots(Addr, QueryNum, PacketNum, bFinalPacket);
 	}
+  else if( QueryType==("playerhashes_"$sPassword) )
+	{
+    if (replayToQuery("H") && (sPassword != "")) SendPlayerHashes(Addr, QueryNum, PacketNum, bFinalPacket);
+	}
   else super.ParseQuery(Addr, Query, QueryNum, PacketNum);
   return QueryRest;
 }
@@ -169,6 +175,7 @@ function string FixPlayerName(string name)
 function string GetPlayerDetails( Controller P, int PlayerNum )
 {
   local string ResultSet;
+  local int RealLives;
 
   // Frags
 	ResultSet = "\\frags_"$PlayerNum$"\\"$int(P.PlayerReplicationInfo.Score);
@@ -192,7 +199,10 @@ function string GetPlayerDetails( Controller P, int PlayerNum )
   ResultSet = ResultSet$"\\carries_"$PlayerNum$"\\"$(P.PlayerReplicationInfo.HasFlag != none);
 
   // number of lives
-  ResultSet = ResultSet$"\\lives_"$PlayerNum$"\\"$P.PlayerReplicationInfo.NumLives;
+  // lives bug workaround
+  RealLives = round(Level.Game.MaxLives - P.PlayerReplicationInfo.Deaths);
+  if (RealLives < 0) RealLives = 0;
+  ResultSet = ResultSet$"\\lives_"$PlayerNum$"\\"$RealLives;
 
   return ResultSet;
 }
@@ -348,6 +358,49 @@ function bool SendBots(IpAddr Addr, int QueryNum, out int PacketNum, int bFinalP
   			Result = SendResult || Result;
 	  		i++;
 		  }
+    }
+	}
+
+	if(bFinalPacket==1)
+  {
+    SendResult = SendAPacket(Addr,QueryNum,PacketNum,bFinalPacket);
+		Result = SendResult || Result;
+	}
+
+	return Result;
+}
+
+// get player hash information
+function string GetPlayerHash( PlayerController P, int PlayerNum )
+{
+  local string ResultSet;
+
+	ResultSet = "\\phname_"$PlayerNum$"\\"$FixPlayerName(P.PlayerReplicationInfo.PlayerName);
+  if (Level.Game.GameStats != none)
+    ResultSet = "\\phash_"$PlayerNum$"\\"$P.GetPlayerIDHash();
+    else ResultSet = ResultSet$"\\phash_"$PlayerNum$"\\__no_gamestats__";
+  ResultSet = "\\phip_"$PlayerNum$"\\"$P.GetPlayerNetworkAddress();
+
+  return ResultSet;
+}
+
+// Send data for each player
+function bool SendPlayerHashes(IpAddr Addr, int QueryNum, out int PacketNum, int bFinalPacket)
+{
+	local Controller P;
+	local int i;
+	local bool Result, SendResult;
+	
+	Result = false;
+
+	i = 0;
+  for( P = Level.ControllerList; P != None; P = P.NextController )
+  {
+	  if (!P.bDeleteMe && P.bIsPlayer && P.PlayerReplicationInfo != None)
+	  {
+  		SendResult = SendQueryPacket(Addr, GetPlayerHash(PlayerController(p), i), QueryNum, PacketNum, 0);
+  		Result = SendResult || Result;
+	  	i++;
     }
 	}
 
