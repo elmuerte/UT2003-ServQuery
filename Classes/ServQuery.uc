@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 // filename:    ServQuery.uc
-// version:     114
+// version:     115
 // author:      Michiel 'El Muerte' Hendriks <elmuerte@drunksnipers.com>
 // additional
 //      ideas:  Ben Smit - ProAsm <proasm@stormnet.co.za>
@@ -9,7 +9,7 @@
 
 class ServQuery extends UdpGameSpyQuery;
 
-const VERSION = "114";
+const VERSION = "115";
 
 var config bool bVerbose;
 var config string sReplyTo;
@@ -204,6 +204,9 @@ function string GetPlayerDetails( Controller P, int PlayerNum )
   if (RealLives < 0) RealLives = 0;
   ResultSet = ResultSet$"\\lives_"$PlayerNum$"\\"$RealLives;
 
+  // time playing ...
+  ResultSet = ResultSet$"\\playtime_"$PlayerNum$"\\"$int(Level.Game.StartTime-P.PlayerReplicationInfo.StartTime);
+
   return ResultSet;
 }
 
@@ -335,6 +338,9 @@ function string GetBot( Controller P, int PlayerNum )
 	// Name
 	ResultSet = "\\bot_"$PlayerNum$"\\"$FixPlayerName(P.PlayerReplicationInfo.PlayerName);
 
+  // Ping
+	ResultSet = ResultSet$"\\ping_"$PlayerNum$"\\"$P.PlayerReplicationInfo.Ping;
+
 	return ResultSet$GetPlayerDetails(P, PlayerNum);
 }
 
@@ -376,9 +382,7 @@ function string GetPlayerHash( PlayerController P, int PlayerNum )
   local string ResultSet;
 
 	ResultSet = "\\phname_"$PlayerNum$"\\"$FixPlayerName(P.PlayerReplicationInfo.PlayerName);
-  if (Level.Game.GameStats != none)
-    ResultSet = ResultSet$"\\phash_"$PlayerNum$"\\"$P.GetPlayerIDHash();
-    else ResultSet = ResultSet$"\\phash_"$PlayerNum$"\\__no_gamestats__";
+  ResultSet = ResultSet$"\\phash_"$PlayerNum$"\\"$P.GetPlayerIDHash();
   ResultSet = ResultSet$"\\phip_"$PlayerNum$"\\"$P.GetPlayerNetworkAddress();
 
   return ResultSet;
