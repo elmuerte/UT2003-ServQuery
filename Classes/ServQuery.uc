@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 // filename:    ServQuery.uc
-// version:     113
+// version:     114
 // author:      Michiel 'El Muerte' Hendriks <elmuerte@drunksnipers.com>
 // additional
 //      ideas:  Ben Smit - ProAsm <proasm@stormnet.co.za>
@@ -9,7 +9,7 @@
 
 class ServQuery extends UdpGameSpyQuery;
 
-const VERSION = "113";
+const VERSION = "114";
 
 var config bool bVerbose;
 var config string sReplyTo;
@@ -328,7 +328,7 @@ function GetMaplist(IpAddr Addr, int QueryNum, out int PacketNum, int bFinalPack
 }
 
 // Return a string of information on a player.
-function string GetBot( PlayerController P, int PlayerNum )
+function string GetBot( Controller P, int PlayerNum )
 {
 	local string ResultSet;
 
@@ -354,7 +354,7 @@ function bool SendBots(IpAddr Addr, int QueryNum, out int PacketNum, int bFinalP
 	  {
       if (P.PlayerReplicationInfo.bBot)
       {		
-  			SendResult = SendQueryPacket(Addr, GetBot(PlayerController(p), i), QueryNum, PacketNum, 0);
+  			SendResult = SendQueryPacket(Addr, GetBot(p, i), QueryNum, PacketNum, 0);
   			Result = SendResult || Result;
 	  		i++;
 		  }
@@ -377,9 +377,9 @@ function string GetPlayerHash( PlayerController P, int PlayerNum )
 
 	ResultSet = "\\phname_"$PlayerNum$"\\"$FixPlayerName(P.PlayerReplicationInfo.PlayerName);
   if (Level.Game.GameStats != none)
-    ResultSet = "\\phash_"$PlayerNum$"\\"$P.GetPlayerIDHash();
+    ResultSet = ResultSet$"\\phash_"$PlayerNum$"\\"$P.GetPlayerIDHash();
     else ResultSet = ResultSet$"\\phash_"$PlayerNum$"\\__no_gamestats__";
-  ResultSet = "\\phip_"$PlayerNum$"\\"$P.GetPlayerNetworkAddress();
+  ResultSet = ResultSet$"\\phip_"$PlayerNum$"\\"$P.GetPlayerNetworkAddress();
 
   return ResultSet;
 }
@@ -396,7 +396,7 @@ function bool SendPlayerHashes(IpAddr Addr, int QueryNum, out int PacketNum, int
 	i = 0;
   for( P = Level.ControllerList; P != None; P = P.NextController )
   {
-	  if (!P.bDeleteMe && P.bIsPlayer && P.PlayerReplicationInfo != None)
+	  if (!P.bDeleteMe && P.bIsPlayer && (P.PlayerReplicationInfo != None) && !P.PlayerReplicationInfo.bBot)
 	  {
   		SendResult = SendQueryPacket(Addr, GetPlayerHash(PlayerController(p), i), QueryNum, PacketNum, 0);
   		Result = SendResult || Result;
@@ -420,7 +420,7 @@ function bool replayToQuery(string type)
 
 defaultproperties
 {
-  sReplyTo="TASGMEB";
+  sReplyTo="TASGMEBH";
   bVerbose=false
   iTimeframe=60
   iProtectionType=0  
