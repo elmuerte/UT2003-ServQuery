@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 // filename:    ServQuery.uc
-// version:     109
+// version:     110
 // author:      Michiel 'El Muerte' Hendriks <elmuerte@drunksnipers.com>
 // additional
 //      ideas:  Ben Smit - ProAsm <proasm@stormnet.co.za>
@@ -9,7 +9,7 @@
 
 class ServQuery extends UdpGameSpyQuery;
 
-const VERSION = "109beta";
+const VERSION = "110";
 
 var config bool bVerbose;
 var config int iTimeframe;
@@ -108,7 +108,8 @@ function string ParseQuery( IpAddr Addr, coerce string Query, int QueryNum, out 
 	}
   else if( QueryType=="maplist" )
 	{
-    Result = SendQueryPacket(Addr, GetMaplist(), QueryNum, PacketNum, bFinalPacket);
+    //Result = SendQueryPacket(Addr, GetMaplist(), QueryNum, PacketNum, bFinalPacket);
+    GetMaplist(Addr, QueryNum, PacketNum, bFinalPacket);
 	}
   else if( QueryType=="echo" )
 	{
@@ -285,7 +286,7 @@ function string GetGamestatus()
   return ResultSet;
 }
 
-function string GetMaplist()
+function GetMaplist(IpAddr Addr, int QueryNum, out int PacketNum, int bFinalPacket)
 {
   local string ResultSet;
   local MapList MyList;
@@ -296,10 +297,9 @@ function string GetMaplist()
 	{
     for ( i=0; i < MyList.Maps.Length; i++ )
 	  {
-      ResultSet = ResultSet$"\\maplist_"$i$"\\"$MyList.Maps[i];
+      SendQueryPacket(Addr, "\\maplist_"$i$"\\"$MyList.Maps[i], QueryNum, PacketNum, bFinalPacket);
     }
   }
-  return ResultSet;
 }
 
 defaultproperties
