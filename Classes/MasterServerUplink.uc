@@ -1,13 +1,14 @@
 ///////////////////////////////////////////////////////////////////////////////
 // filename:    MasterServerUplink.uc
-// version:     101
+// version:     102
 // author:      Michiel 'El Muerte' Hendriks <elmuerte@drunksnipers.com>
 // perpose:     replace the original masterserveruplink
 ///////////////////////////////////////////////////////////////////////////////
 
 class MasterServerUplink extends IpDrv.MasterServerUplink config;
 
-var globalconfig bool ListenToGamespy;
+var config bool ListenToGamespy;
+var config class<UdpGamespyQuery> UdpGamespyQueryClass;
 
 event BeginPlay()
 {
@@ -17,7 +18,7 @@ event BeginPlay()
   if ( ListenToGamespy )
   {
     log("Spawning ServQuery");
-	  GamespyQuery  = Spawn( class'ServQuery' );
+	  GamespyQuery  = Spawn(UdpGamespyQueryClass);
     // FMasterServerUplink needs this for NAT.
 		GamespyQueryLink = GamespyQuery;
   }
@@ -52,4 +53,5 @@ event BeginPlay()
 defaultproperties
 {
   ListenToGamespy=true
+  UdpGamespyQueryClass=class'ServQuery'
 }

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 // filename:    ServQuery.uc
-// version:     110
+// version:     112
 // author:      Michiel 'El Muerte' Hendriks <elmuerte@drunksnipers.com>
 // additional
 //      ideas:  Ben Smit - ProAsm <proasm@stormnet.co.za>
@@ -9,9 +9,10 @@
 
 class ServQuery extends UdpGameSpyQuery;
 
-const VERSION = "110";
+const VERSION = "112";
 
 var config bool bVerbose;
+var config string sReplyTo;
 var config int iTimeframe;
 var config int iProtectionType;
 var config int iMaxQueryPerSecond; // type 1
@@ -92,30 +93,35 @@ function string ParseQuery( IpAddr Addr, coerce string Query, int QueryNum, out 
 
   if( QueryType=="teams" )
 	{
-    if (Level.Game.bTeamGame) Result = SendQueryPacket(Addr, GetTeams(), QueryNum, PacketNum, bFinalPacket);
+    if (replayToQuery("T")) if (Level.Game.bTeamGame) Result = SendQueryPacket(Addr, GetTeams(), QueryNum, PacketNum, bFinalPacket);
 	}
   else if( QueryType=="about" )
 	{
-		Result = SendQueryPacket(Addr, "\\about\\ServQuery "$VERSION$"\\author\\Michiel 'El Muerte' Hendriks\\authoremail\\elmuerte@drunksnipers.com", QueryNum, PacketNum, bFinalPacket);
+		if (replayToQuery("A")) Result = SendQueryPacket(Addr, "\\about\\ServQuery "$VERSION$"\\author\\Michiel 'El Muerte' Hendriks\\authoremail\\elmuerte@drunksnipers.com", QueryNum, PacketNum, bFinalPacket);
 	}
   else if( QueryType=="spectators" )
 	{
-    Result = SendQueryPacket(Addr, GetSpectators(), QueryNum, PacketNum, bFinalPacket);
+    if (replayToQuery("S")) Result = SendQueryPacket(Addr, GetSpectators(), QueryNum, PacketNum, bFinalPacket);
 	}
   else if( QueryType=="gamestatus" )
 	{
-    Result = SendQueryPacket(Addr, GetGamestatus(), QueryNum, PacketNum, bFinalPacket);
+    if (replayToQuery("G")) Result = SendQueryPacket(Addr, GetGamestatus(), QueryNum, PacketNum, bFinalPacket);
 	}
   else if( QueryType=="maplist" )
 	{
-    //Result = SendQueryPacket(Addr, GetMaplist(), QueryNum, PacketNum, bFinalPacket);
-    GetMaplist(Addr, QueryNum, PacketNum, bFinalPacket);
+    if (replayToQuery("M")) GetMaplist(Addr, QueryNum, PacketNum, bFinalPacket);
 	}
   else if( QueryType=="echo" )
+	{		
+    if (replayToQuery("E")) 
+    {
+      ReplaceText(QueryValue, chr(10), ""); // fixed to remove the \n
+	  	Result = SendQueryPacket(Addr, "\\echo_reply\\"$QueryValue, QueryNum, PacketNum, bFinalPacket);
+    }
+	}
+  else if( QueryType=="bots" )
 	{
-		// fixed to remove the \n
-    ReplaceText(QueryValue, chr(10), "");
-		Result = SendQueryPacket(Addr, "\\echo\\"$QueryValue, QueryNum, PacketNum, bFinalPacket);
+    if (replayToQuery("B")) SendBots(Addr, QueryNum, PacketNum, bFinalPacket);
 	}
   else super.ParseQuery(Addr, Query, QueryNum, PacketNum);
   return QueryRest;
@@ -160,19 +166,12 @@ function string FixPlayerName(string name)
   return name;
 }
 
-// Return a string of information on a player.
-function string GetPlayer( PlayerController P, int PlayerNum )
+function string GetPlayerDetails( PlayerController P, int PlayerNum )
 {
-	local string ResultSet;
+  local string ResultSet;
 
-	// Name
-	ResultSet = "\\player_"$PlayerNum$"\\"$FixPlayerName(P.PlayerReplicationInfo.PlayerName);
-
-	// Frags
-	ResultSet = ResultSet$"\\frags_"$PlayerNum$"\\"$int(P.PlayerReplicationInfo.Score);
-
-	// Ping
-	ResultSet = ResultSet$"\\ping_"$PlayerNum$"\\"$P.ConsoleCommand("GETPING");
+  // Frags
+	ResultSet = "\\frags_"$PlayerNum$"\\"$int(P.PlayerReplicationInfo.Score);
 
 	// Team
 	if(P.PlayerReplicationInfo.Team != None)
@@ -192,7 +191,24 @@ function string GetPlayer( PlayerController P, int PlayerNum )
   // has flag/ball ...
   ResultSet = ResultSet$"\\carries_"$PlayerNum$"\\"$(P.PlayerReplicationInfo.HasFlag != none);
 
-	return ResultSet;
+  // number of lives
+  ResultSet = ResultSet$"\\lives_"$PlayerNum$"\\"$P.PlayerReplicationInfo.NumLives;
+
+  return ResultSet;
+}
+
+// Return a string of information on a player.
+function string GetPlayer( PlayerController P, int PlayerNum )
+{
+	local string ResultSet;
+
+	// Name
+	ResultSet = "\\player_"$PlayerNum$"\\"$FixPlayerName(P.PlayerReplicationInfo.PlayerName);
+
+  // Ping
+	ResultSet = ResultSet$"\\ping_"$PlayerNum$"\\"$P.ConsoleCommand("GETPING");
+
+	return ResultSet$GetPlayerDetails(P, PlayerNum);
 }
 
 // Return a string of miscellaneous information.
@@ -220,7 +236,7 @@ function string GetRules()
     ServerState.ServerInfo[i].Value = "0";
   }
 	for( i=0;i<ServerState.ServerInfo.Length;i++ )
-		ResultSet = ResultSet$"\\"$ServerState.ServerInfo[i].Key$"\\"$ServerState.ServerInfo[i].Value;
+		ResultSet = ResultSet$"\\"$ServerState.ServerInfo[i].Key$"\\"$FixPlayerName(ServerState.ServerInfo[i].Value);
 	return ResultSet;
 }
 
@@ -280,7 +296,7 @@ function string GetGamestatus()
     {
       i = 0;
     }
-    ResultSet = ResultSet$"\\nextmap\\"$MyList.Maps[i];
+    ResultSet = ResultSet$"\\nextmap\\"$FixPlayerName(MyList.Maps[i]);
 		MyList.Destroy();
 	}  
   return ResultSet;
@@ -288,7 +304,6 @@ function string GetGamestatus()
 
 function GetMaplist(IpAddr Addr, int QueryNum, out int PacketNum, int bFinalPacket)
 {
-  local string ResultSet;
   local MapList MyList;
   local int i;
 
@@ -297,13 +312,62 @@ function GetMaplist(IpAddr Addr, int QueryNum, out int PacketNum, int bFinalPack
 	{
     for ( i=0; i < MyList.Maps.Length; i++ )
 	  {
-      SendQueryPacket(Addr, "\\maplist_"$i$"\\"$MyList.Maps[i], QueryNum, PacketNum, bFinalPacket);
+      SendQueryPacket(Addr, "\\maplist_"$i$"\\"$FixPlayerName(MyList.Maps[i]), QueryNum, PacketNum, bFinalPacket);
     }
   }
 }
 
+// Return a string of information on a player.
+function string GetBot( PlayerController P, int PlayerNum )
+{
+	local string ResultSet;
+
+	// Name
+	ResultSet = "\\bot_"$PlayerNum$"\\"$FixPlayerName(P.PlayerReplicationInfo.PlayerName);
+
+	return ResultSet$GetPlayerDetails(P, PlayerNum);
+}
+
+// Send data for each player
+function bool SendBots(IpAddr Addr, int QueryNum, out int PacketNum, int bFinalPacket)
+{
+	local Controller P;
+	local int i;
+	local bool Result, SendResult;
+	
+	Result = false;
+
+	i = 0;
+  for( P = Level.ControllerList; P != None; P = P.NextController )
+  {
+	  if (!P.bDeleteMe && P.PlayerReplicationInfo != None)
+	  {
+      if (P.PlayerReplicationInfo.bBot)
+      {		
+  			SendResult = SendQueryPacket(Addr, GetBot(PlayerController(p), i), QueryNum, PacketNum, 0);
+  			Result = SendResult || Result;
+	  		i++;
+		  }
+    }
+	}
+
+	if(bFinalPacket==1)
+  {
+    SendResult = SendAPacket(Addr,QueryNum,PacketNum,bFinalPacket);
+		Result = SendResult || Result;
+	}
+
+	return Result;
+}
+
+function bool replayToQuery(string type)
+{
+  return (InStr(sReplyTo, type) > -1);
+}
+
 defaultproperties
 {
+  sReplyTo="TASGMEB";
   bVerbose=false
   iTimeframe=60
   iProtectionType=0  
